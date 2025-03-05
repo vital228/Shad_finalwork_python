@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Book Library App",
     description="Учебное приложение для MTS Shad",
-    version="0.0.1",
+    version="0.0.2",
     default_response_class=ORJSONResponse,
     responses={404: {"description": "Not found!"}},  # Подключаем быстрый сериализатор
     lifespan=lifespan,

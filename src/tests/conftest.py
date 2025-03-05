@@ -15,6 +15,7 @@ from src.models import books  # noqa
 from src.models.base import BaseModel
 from src.models.books import Book  # noqa F401
 
+
 # Переопределяем движок для запуска тестов и подключаем его к тестовой базе.
 # Это решает проблему с сохранностью данных в основной базе приложения.
 # Фикстуры тестов их не зачистят.
@@ -87,3 +88,5 @@ async def async_client(test_app):
         transport=transport, base_url="http://127.0.0.1:8000"
     ) as test_client:
         yield test_client
+
+
