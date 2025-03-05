@@ -1,14 +1,14 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, status, HTTPException
 from sqlalchemy import select, func, cast
 from src.models.sellers import Seller
 from src.models.books import Book
 from sqlalchemy.dialects.postgresql import JSONB
-from src.schemas import IncomingSeller, ReturnedAllSellers, ReturnedSeller
+from src.schemas import IncomingSeller, ReturnedAllSellers, ReturnedSeller, ReturnedSellerWithBooks
 from icecream import ic
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.configurations import get_async_session
-from sqlalchemy.orm import joinedload
+from auth.oauth2 import get_current_user
 
 sellers_router = APIRouter(tags=["sellers"], prefix="/sellers")
 
@@ -35,6 +35,13 @@ async def create_seller(
         }
     )
 
+    user : Seller = await session.scalar(select(Seller).where(Seller.e_mail == seller.e_mail))
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Пользователь с таким e-mail уже существует"
+        )
+
     session.add(new_seller)
     await session.flush()
 
@@ -53,8 +60,11 @@ async def get_all_sellers(session: DBSession):
 
 
 # Ручка для получение продавца по его ИД
-@sellers_router.get("/{seller_id}", response_model=ReturnedSeller)
-async def get_seller(seller_id: int, session: DBSession):
+@sellers_router.get("/{seller_id}", response_model=ReturnedSellerWithBooks)
+async def get_seller(seller_id: int, session: DBSession, current_user: str = Depends(get_current_user)):
+    user : Seller = await session.scalar(select(Seller).where(Seller.e_mail == current_user))
+    if not user:
+        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
     result = await session.execute(
         select(
             Seller.id,
@@ -68,7 +78,7 @@ async def get_seller(seller_id: int, session: DBSession):
                         "title", Book.title,
                         "author", Book.author,
                         "year", Book.year,
-                        "pages", Book.pages
+                        "pages", Book.pages,
                     )
                 ).filter(Book.id.isnot(None)),  # Исключаем NULL
                 cast("[]", JSONB)  # Явное указание, что это JSONB
@@ -83,6 +93,9 @@ async def get_seller(seller_id: int, session: DBSession):
     
     if not seller:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    if not user or seller_id != user.id:
+        return Response(status_code=status.HTTP_403_FORBIDDEN)
 
     seller_dict = seller._asdict()
     seller_dict["books"] = seller_dict["books"] if isinstance(seller_dict["books"], list) else []

@@ -7,10 +7,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import select
 from src.models.books import Book
+from src.models.sellers import Seller
 from src.schemas import IncomingBook, ReturnedAllbooks, ReturnedBook
 from icecream import ic
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.configurations import get_async_session
+from auth.oauth2 import get_current_user
 
 books_router = APIRouter(tags=["books"], prefix="/books")
 
@@ -27,17 +29,20 @@ DBSession = Annotated[AsyncSession, Depends(get_async_session)]
 async def create_book(
     book: IncomingBook,
     session: DBSession,
+    current_user: str = Depends(get_current_user),
 ):  # прописываем модель валидирующую входные данные
     # session = get_async_session() вместо этого мы используем иньекцию зависимостей DBSession
-
+    seller : Seller = await session.scalar(select(Seller).where(Seller.e_mail == current_user))
     # это - бизнес логика. Обрабатываем данные, сохраняем, преобразуем и т.д.
+    if not seller:
+        return Response(status_code=status.HTTP_403_FORBIDDEN)
     new_book = Book(
         **{
             "title": book.title,
             "author": book.author,
             "year": book.year,
             "pages": book.pages,
-            "seller_id": book.seller_id,
+            "seller_id": seller.id,
         }
     )
     
@@ -63,8 +68,8 @@ async def get_all_books(session: DBSession):
 @books_router.get("/{book_id}", response_model=ReturnedBook)
 async def get_book(book_id: int, session: DBSession):
     if result := await session.get(Book, book_id):
-        return result
-
+        return result    
+        
     return Response(status_code=status.HTTP_404_NOT_FOUND)
 
 
@@ -81,9 +86,12 @@ async def delete_book(book_id: int, session: DBSession):
 
 # Ручка для обновления данных о книге
 @books_router.put("/{book_id}", response_model=ReturnedBook)
-async def update_book(book_id: int, new_book_data: ReturnedBook, session: DBSession):
+async def update_book(book_id: int, new_book_data: ReturnedBook, session: DBSession, current_user: str = Depends(get_current_user)):
+    seller : Seller = await session.scalar(select(Seller).where(Seller.e_mail == current_user))
     # Оператор "морж", позволяющий одновременно и присвоить значение и проверить его. Заменяет то, что закомментировано выше.
     if updated_book := await session.get(Book, book_id):
+        if updated_book.seller_id != seller.id:
+            return Response(status_code=status.HTTP_403_FORBIDDEN)
         updated_book.author = new_book_data.author
         updated_book.title = new_book_data.title
         updated_book.year = new_book_data.year

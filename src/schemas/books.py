@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
-__all__ = ["IncomingBook", "ReturnedBook", "ReturnedAllbooks"]
+__all__ = ["IncomingBook", "ReturnedBook", "ReturnedAllbooks", "ReturnedBookWithoutSeller"]
 
 
 # Базовый класс "Книги", содержащий поля, которые есть во всех классах-наследниках.
@@ -9,7 +9,7 @@ class BaseBook(BaseModel):
     title: str
     author: str
     year: int
-    seller_id: int
+
 
 
 # Класс для валидации входящих данных. Не содержит id так как его присваивает БД.
@@ -17,6 +17,7 @@ class IncomingBook(BaseBook):
     pages: int = Field(
         default=150, alias="count_pages"
     )  # Пример использования тонкой настройки полей. Передачи в них метаинформации.
+    seller_id: int
 
     @field_validator("year")  # Валидатор, проверяет что дата не слишком древняя
     @staticmethod
@@ -36,6 +37,11 @@ class IncomingBook(BaseBook):
 
 # Класс, валидирующий исходящие данные. Он уже содержит id
 class ReturnedBook(BaseBook):
+    id: int
+    pages: int
+    seller_id: int
+
+class ReturnedBookWithoutSeller(BaseBook):
     id: int
     pages: int
 

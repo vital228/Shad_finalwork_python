@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field, field_validator, EmailStr
+from pydantic import BaseModel, field_validator, EmailStr
 from pydantic_core import PydanticCustomError
 from typing import List
-from .books import ReturnedBook
+from .books import ReturnedBookWithoutSeller
 
-__all__ = ["IncomingSeller", "ReturnedSeller", "ReturnedAllSellers"]
+__all__ = ["IncomingSeller", "ReturnedSeller", "ReturnedAllSellers", "ReturnedSellerWithBooks"]
 
 
 
@@ -35,7 +35,9 @@ class IncomingSeller(BaseSeller):
 # Класс, валидирующий исходящие данные. Он уже содержит id
 class ReturnedSeller(BaseSeller):
     id: int
-    # books: list[ReturnedBook] = Field(default=[])  # При создании у продавца пока нет книг
+
+class ReturnedSellerWithBooks(ReturnedSeller):
+    books: List[ReturnedBookWithoutSeller]
 
 
 # Класс для возврата массива объектов "Продавец"
